@@ -1,0 +1,2 @@
+.home-nav .brand strong{font-size:18px}.home-nav .brand small{font-size:13px}.home-nav .brand>span{width:42px;height:42px;font-size:15px}
+@media(max-width:760px){.home-nav .brand strong{font-size:15px}.home-nav .brand small{font-size:12px}.home-nav .brand>span{width:38px;height:38px}}

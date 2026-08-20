@@ -1,0 +1,2 @@
+import React from 'react'; import { createRoot } from 'react-dom/client'; import 'bootstrap/dist/css/bootstrap.min.css'; import './styles.css'; import './home.css'; import './home-responsive.css'; import './home-polish.css'; import './home-brand.css'; import './home-layout.css'; import './home-colors.css'; import './home-dashboard.css'; import './interview.css'; import './account.css'; import App from './App';
+createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);

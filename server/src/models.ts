@@ -1,0 +1,11 @@
+import mongoose, { Schema } from 'mongoose';
+const ResourceSchema=new Schema({name:String,type:String,url:String,free:Boolean},{_id:false});
+const StepSchema=new Schema({title:String,completed:{type:Boolean,default:false}},{_id:false});
+const TopicSchema=new Schema({title:String,slug:String,description:String,difficulty:String,estimatedMinutes:Number,learningSteps:[StepSchema],resources:[ResourceSchema],interviewQuestions:[String],order:Number});
+const ModuleSchema=new Schema({title:{type:String,required:true},slug:{type:String,unique:true},description:String,level:String,category:String,estimatedDays:Number,topics:[TopicSchema],order:Number},{timestamps:true});
+const UserSchema=new Schema({name:{type:String,required:true},email:{type:String,unique:true,required:true},password:{type:String,required:true},role:{type:String,default:'learner'},selectedTrack:String,avatar:String,theme:{type:String,default:'light'}},{timestamps:true});
+const ProgressSchema=new Schema({user:{type:Schema.Types.ObjectId,ref:'User'},module:{type:String},topic:{type:String},completedSteps:[Number],topicProgress:Number,completed:Boolean,lastStudiedAt:Date},{timestamps:true});
+const NoteSchema=new Schema({user:{type:Schema.Types.ObjectId,ref:'User'},module:String,topic:String,title:String,content:String,tags:[String]},{timestamps:true});
+const StudySessionSchema=new Schema({user:{type:Schema.Types.ObjectId,ref:'User'},module:String,topic:String,duration:Number,startedAt:Date,completedAt:Date},{timestamps:true});
+const QuestionSchema=new Schema({category:String,question:String,difficulty:String,answer:String,explanation:String,relatedTopic:String});
+export const User=mongoose.model('User',UserSchema); export const Module=mongoose.model('Module',ModuleSchema); export const Progress=mongoose.model('Progress',ProgressSchema); export const Note=mongoose.model('Note',NoteSchema); export const StudySession=mongoose.model('StudySession',StudySessionSchema); export const InterviewQuestion=mongoose.model('InterviewQuestion',QuestionSchema); export const Resource=mongoose.model('Resource',ResourceSchema); export const ReviewItem=mongoose.model('ReviewItem',new Schema({user:Schema.Types.ObjectId,type:String,itemId:String,status:{type:String,default:'open'},snoozedUntil:Date},{timestamps:true}));
