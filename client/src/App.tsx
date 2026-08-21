@@ -310,6 +310,19 @@ const initials = (name: string) =>
     .join("")
     .slice(0, 2)
     .toUpperCase();
+const getTimeGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+};
+const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const apiRequest = async (path: string, options: RequestInit = {}) => {
+  const token = localStorage.getItem("dsj-token");
+  const response = await fetch(`${apiUrl}${path}`, { ...options, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) } });
+  if (!response.ok) throw new Error("API request failed");
+  return response.status === 204 ? null : response.json();
+};
 const logoutUser = (navigate: (to: string) => void) => {
   if (!window.confirm("Are you sure you want to log out?")) return;
   localStorage.removeItem("dsj-token");
@@ -347,6 +360,7 @@ const navItems = [
   { to: "/notes", label: "Notes", icon: FileText },
   { to: "/resources", label: "Resources", icon: BookOpen },
   { to: "/interview", label: "Interview Practice", icon: GraduationCap },
+  { to: "/scenarios", label: "Incident Labs", icon: ShieldCheck },
   { to: "/review", label: "Review Queue", icon: ShieldCheck },
   { to: "/tracks", label: "Career Tracks", icon: Cloud },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
@@ -448,6 +462,7 @@ function Shell() {
             <Route path="/notes" element={<Notes />} />
             <Route path="/resources" element={<Resources />} />
             <Route path="/interview" element={<Interview />} />
+            <Route path="/scenarios" element={<IncidentLabs />} />
             <Route path="/review" element={<Review />} />
             <Route path="/tracks" element={<Tracks />} />
             <Route path="/analytics" element={<Analytics />} />
@@ -493,6 +508,7 @@ function Login({ register = false }: { register?: boolean }) {
       if (!response.ok)
         throw new Error(data.message || "Unable to authenticate");
       localStorage.setItem("dsj-token", data.token);
+      localStorage.setItem("dsj-user", JSON.stringify(data.user));
       nav("/dashboard");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to authenticate");
@@ -617,12 +633,14 @@ function Stat({
   );
 }
 function Dashboard() {
-  const [user, setUser] = useState<{ name?: string; selectedTrack?: string } | null>(null);
+  const [user, setUser] = useState<{ name?: string; selectedTrack?: string } | null>(() => JSON.parse(localStorage.getItem("dsj-user") || "null"));
+  const [studyMinutes, setStudyMinutes] = useState(0);
   useEffect(() => {
     const token = localStorage.getItem("dsj-token");
     if (!token) return;
-    fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }).then((response) => response.ok ? response.json() : null).then((data) => { if (data) setUser(data); }).catch(() => undefined);
+    fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }).then((response) => response.ok ? response.json() : null).then((data) => { if (data) { setUser(data); localStorage.setItem("dsj-user", JSON.stringify(data)); } }).catch(() => undefined);
   }, []);
+  useEffect(() => { apiRequest("/api/analytics").then((data) => setStudyMinutes(Math.round((data.studyTime || []).reduce((sum: number, item: { duration?: number }) => sum + (item.duration || 0), 0) / 60))).catch(() => undefined); }, []);
   const progress = readProgress();
   const done = allTopics.filter(
     (t) => pct(progress[t.id] || []) === 100,
@@ -639,7 +657,7 @@ function Dashboard() {
     <>
       <PageTitle
         eyebrow="YOUR DEVOPS SUPPORT JOURNEY"
-        title={user?.name ? `Good morning, ${user.name}` : "Build the skill, not just the knowledge."}
+        title={user?.name ? `${getTimeGreeting()}, ${user.name}` : "Build the skill, not just the knowledge."}
         subtitle={user?.name ? "Your next useful step is waiting." : "A structured system for learning DevOps, Cloud and Production Support."}
         action={
           <button
@@ -676,7 +694,7 @@ function Dashboard() {
           icon={Clock3}
         />
       </div>
-      <section className="dashboard-personal"><div className="goal-card"><div className="eyebrow">THIS WEEK'S GOAL</div><h2>Complete 3 learning topics</h2><p>Keep your momentum visible and build a study habit that compounds.</p><div className="goal-progress"><i style={{ width: `${Math.min(100, done / 3 * 100)}%` }} /></div><span>{Math.min(done, 3)} of 3 topics completed</span></div><div className="quick-card"><div className="eyebrow">QUICK ACTIONS</div><div className="quick-actions"><NavLink to={`/module/${module.id}`}><BookOpen size={17} /> Continue topic</NavLink><NavLink to="/study"><Clock3 size={17} /> Start focus session</NavLink><NavLink to="/interview"><GraduationCap size={17} /> Practice interview</NavLink><NavLink to="/notes"><FileText size={17} /> Capture a note</NavLink></div></div><div className="target-card"><div className="eyebrow">YOUR TARGET TRACK</div><h3>{user?.selectedTrack || "DevOps Engineer"}</h3><p>Recommended next: Linux, Networking, Cloud, and Troubleshooting.</p><NavLink to="/tracks">View recommendations <ChevronRight size={15} /></NavLink></div></section>
+      <section className="dashboard-personal"><div className="goal-card"><div className="eyebrow">THIS WEEK'S GOAL</div><h2>Complete 3 learning topics</h2><p>Keep your momentum visible and build a study habit that compounds.</p><div className="goal-progress"><i style={{ width: `${Math.min(100, done / 3 * 100)}%` }} /></div><span>{Math.min(done, 3)} of 3 topics completed</span></div><div className="quick-card"><div className="eyebrow">QUICK ACTIONS</div><div className="quick-actions"><NavLink to={`/module/${module.id}`}><BookOpen size={17} /> Continue topic</NavLink><NavLink to="/study"><Clock3 size={17} /> Start focus session</NavLink><NavLink to="/interview"><GraduationCap size={17} /> Practice interview</NavLink><NavLink to="/notes"><FileText size={17} /> Capture a note</NavLink></div></div><div className="target-card"><div className="eyebrow">YOUR TARGET TRACK</div><h3>{user?.selectedTrack || "DevOps Engineer"}</h3><p>Recommended next: Linux, Networking, Cloud, and Troubleshooting.</p><NavLink to="/tracks">View recommendations <ChevronRight size={15} /></NavLink><small className="dashboard-study-time"><Clock3 size={13} /> {Math.floor(studyMinutes / 60)}h {studyMinutes % 60}m studied</small></div></section>
       <section className="activity-panel panel"><div className="section-head"><div><div className="eyebrow">YOUR ACTIVITY</div><h2>Small steps add up.</h2></div><NavLink to="/analytics">View analytics <ChevronRight size={15} /></NavLink></div><div className="activity-list"><span><i className="activity-dot green-dot" /> Account ready <small>Start your first learning step</small></span><span><i className="activity-dot blue-dot" /> 417 topics available <small>Explore the full roadmap</small></span><span><i className="activity-dot gold-dot" /> Leaderboard live <small>See community momentum</small></span></div></section>
       <div className="dashboard-grid">
         <section className="panel continue">
@@ -889,6 +907,7 @@ function ModulePage() {
 }
 function TopicDetail({ topic, module }: { topic: Topic; module: Module }) {
   const [progress, setProgress] = useState(readProgress());
+    useEffect(() => { apiRequest("/api/progress").then((items) => { const remote = items.reduce((result: Record<string, number[]>, item: { topic: string; completedSteps: number[] }) => ({ ...result, [item.topic]: item.completedSteps || [] }), {}); if (Object.keys(remote).length) { setProgress(remote); localStorage.setItem(key, JSON.stringify(remote)); } }).catch(() => undefined); }, []);
   const steps = progress[topic.id] || [];
   const toggle = (i: number) => {
     const next = {
@@ -898,6 +917,7 @@ function TopicDetail({ topic, module }: { topic: Topic; module: Module }) {
         : [...steps, i].sort(),
     };
     setProgress(next);
+      apiRequest(`/api/progress/step/${topic.id}`, { method: "PATCH", body: JSON.stringify({ module: module.id, completedSteps: next[topic.id] }) }).catch(() => undefined);
     localStorage.setItem(key, JSON.stringify(next));
   };
   return (
@@ -972,6 +992,7 @@ function TopicDetail({ topic, module }: { topic: Topic; module: Module }) {
 function Study() {
   const [seconds, setSeconds] = useState(25 * 60);
   const [running, setRunning] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [topicId, setTopicId] = useState(allTopics[0].id);
   const topic = allTopics.find((t) => t.id === topicId)!;
   useEffect(() => {
@@ -982,6 +1003,8 @@ function Study() {
     );
     return () => clearInterval(timer);
   }, [running]);
+  useEffect(() => { if (seconds === 0 && sessionId) { apiRequest("/api/study/complete", { method: "POST", body: JSON.stringify({ id: sessionId, duration: 25 * 60 }) }).catch(() => undefined); setSessionId(null); setRunning(false); } }, [seconds, sessionId]);
+  const startSession = async () => { if (!running) { try { const session = await apiRequest("/api/study/start", { method: "POST", body: JSON.stringify({ module: topic.moduleTitle, topic: topic.title }) }); setSessionId(session?._id || null); } catch { /* local timer remains usable */ } } setRunning(!running); };
   const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
   const secs = String(seconds % 60).padStart(2, "0");
   return (
@@ -1017,7 +1040,7 @@ function Study() {
             <button onClick={() => setSeconds(50 * 60)}>50 minutes</button>
             <button onClick={() => setSeconds(10 * 60)}>Custom</button>
           </div>
-          <button className="primary" onClick={() => setRunning(!running)}>
+          <button className="primary" onClick={startSession}>
             {running ? (
               <>
                 <Clock3 size={16} /> Pause
@@ -1072,6 +1095,7 @@ function Notes() {
   );
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  useEffect(() => { apiRequest("/api/notes").then((items) => { if (items?.length) { setNotes(items.map((item: any) => ({ id: item._id, moduleTitle: item.module, topicTitle: item.topic, title: item.title, content: item.content, tags: item.tags || [], date: new Date(item.createdAt).toLocaleDateString() }))); } }).catch(() => undefined); }, []);
   const add = () => {
     if (!title || !content) return;
     const next = [
@@ -1088,6 +1112,7 @@ function Notes() {
     ];
     setNotes(next);
     localStorage.setItem("dsj-notes", JSON.stringify(next));
+    apiRequest("/api/notes", { method: "POST", body: JSON.stringify({ module: "Linux Fundamentals", topic: "Current study topic", title, content, tags: ["devops", "study"] }) }).catch(() => undefined);
     setTitle("");
     setContent("");
   };
@@ -1095,6 +1120,7 @@ function Notes() {
     const next = notes.filter((n) => n.id !== id);
     setNotes(next);
     localStorage.setItem("dsj-notes", JSON.stringify(next));
+    if (!id.startsWith("local-")) apiRequest(`/api/notes/${id}`, { method: "DELETE" }).catch(() => undefined);
   };
   return (
     <>
@@ -1267,6 +1293,10 @@ function Interview() {
     </>
   );
 }
+function IncidentLabs() {
+  const labs = [{ title: "Disk usage is 100%", signal: "Users report write failures and services are degrading.", command: "df -h && du -xhd1 /var | sort -h", lesson: "Find the largest filesystem and directory before removing or rotating anything." }, { title: "API returns 502", signal: "The reverse proxy is healthy but the upstream application is unavailable.", command: "curl -I http://localhost:8080/health && journalctl -u app", lesson: "Separate proxy health from upstream health, then inspect service status and recent logs." }, { title: "Kubernetes pod crash loop", signal: "A deployment is repeatedly restarting after a release.", command: "kubectl get pods && kubectl describe pod <pod> && kubectl logs <pod> --previous", lesson: "Use events and previous-container logs to identify configuration, image, or dependency failures." }, { title: "High CPU on production server", signal: "Latency is rising and the host CPU has stayed above 90%.", command: "uptime && top -b -n 1 | head -20 && ps aux --sort=-%cpu | head", lesson: "Confirm scope, identify the process, check recent changes, and mitigate without destroying evidence." }];
+  return <><PageTitle eyebrow="PRACTICE REAL INCIDENTS" title="Incident Labs" subtitle="Work through production-style signals before they become production surprises."/><div className="lab-grid">{labs.map((lab) => <article className="lab-card" key={lab.title}><span className="pill">Scenario lab</span><h2>{lab.title}</h2><p>{lab.signal}</p><details><summary>Reveal investigation path</summary><div className="lab-command"><Terminal size={15}/><code>{lab.command}</code></div><p><b>What good looks like:</b> {lab.lesson}</p></details><button className="secondary">Mark lab complete <Check size={15}/></button></article>)}</div></>;
+}
 function Review() {
   return (
     <>
@@ -1287,6 +1317,8 @@ function Review() {
   );
 }
 function Tracks() {
+  const [selected, setSelected] = useState(() => JSON.parse(localStorage.getItem("dsj-user") || "{}")?.selectedTrack || "DevOps Engineer");
+  const selectTrack = async (track: string) => { setSelected(track); const user = JSON.parse(localStorage.getItem("dsj-user") || "{}"); localStorage.setItem("dsj-user", JSON.stringify({ ...user, selectedTrack: track })); try { const updated = await apiRequest("/api/auth/profile", { method: "PATCH", body: JSON.stringify({ selectedTrack: track }) }); if (updated) localStorage.setItem("dsj-user", JSON.stringify(updated)); } catch { /* local selection remains available */ } };
   return (
     <>
       <PageTitle
@@ -1318,8 +1350,8 @@ function Tracks() {
                   <span key={s}>{s}</span>
                 ))}
             </div>
-            <button className="secondary">
-              Select track <ChevronRight size={15} />
+            <button className={selected === track ? "primary" : "secondary"} onClick={() => selectTrack(track)}>
+              {selected === track ? "Selected" : "Select track"} <ChevronRight size={15} />
             </button>
           </article>
         ))}
@@ -1403,6 +1435,8 @@ function Profile() {
     email?: string;
     selectedTrack?: string;
   } | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState("");
   useEffect(() => {
     const token = localStorage.getItem("dsj-token");
     if (!token) return;
@@ -1414,6 +1448,7 @@ function Profile() {
       .then((data) => {
         if (data) {
           setUser(data);
+          setDraftName(data.name || "");
           localStorage.setItem("dsj-user", JSON.stringify(data));
         }
       })
@@ -1422,6 +1457,7 @@ function Profile() {
   const name = user?.name || "Loading profile...";
   const email = user?.email || "";
   const track = user?.selectedTrack || "DevOps Engineer";
+  const saveProfile = async () => { try { const updated = await apiRequest("/api/auth/profile", { method: "PATCH", body: JSON.stringify({ name: draftName }) }); setUser(updated); localStorage.setItem("dsj-user", JSON.stringify(updated)); setEditing(false); } catch { setEditing(false); } };
   return (
     <>
       <PageTitle
@@ -1432,12 +1468,12 @@ function Profile() {
       <section className="panel profile-panel">
         <div className="profile-avatar">{initials(name)}</div>
         <div>
-          <h2>{name}</h2>
+          {editing ? <input className="profile-edit-input" value={draftName} onChange={(event) => setDraftName(event.target.value)} /> : <h2>{name}</h2>}
           <p>{email}</p>
           <span className="pill">{track}</span>
         </div>
-        <button className="secondary ms-auto">
-          <Settings size={16} /> Edit profile
+        <button className="secondary ms-auto" onClick={() => editing ? saveProfile() : setEditing(true)}>
+          <Settings size={16} /> {editing ? "Save profile" : "Edit profile"}
         </button>
         <button className="secondary" onClick={() => logoutUser(navigate)}>
           <LogOut size={16} /> Log out
