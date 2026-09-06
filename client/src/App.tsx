@@ -486,10 +486,12 @@ function Shell() {
 }
 function Login({ register = false }: { register?: boolean }) {
   const nav = useNavigate();
+  const teacherMode = new URLSearchParams(window.location.search).get("role") === "teacher";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const submit = async () => {
@@ -510,7 +512,7 @@ function Login({ register = false }: { register?: boolean }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
-            register ? { name, email, password } : { email, password },
+            register ? { name, email, password, ...(teacherMode ? { inviteCode } : {}) } : { email, password },
           ),
         },
       );
@@ -536,8 +538,8 @@ function Login({ register = false }: { register?: boolean }) {
             <small>Journey</small>
           </div>
         </div>
-        <div className="eyebrow">LEARN. PRACTICE. TROUBLESHOOT. DEPLOY.</div>
-        <h1>{register ? "Start your journey" : "Welcome back"}</h1>
+        <div className="eyebrow">{teacherMode ? "AUTHORIZED TEACHER REGISTRATION" : "LEARN. PRACTICE. TROUBLESHOOT. DEPLOY."}</div>
+        <h1>{teacherMode ? "Join as a teacher" : register ? "Start your journey" : "Welcome back"}</h1>
         <p>Build the skill, not just the knowledge.</p>
         {register && (
           <input
@@ -547,6 +549,7 @@ function Login({ register = false }: { register?: boolean }) {
             onChange={(e) => setName(e.target.value)}
           />
         )}
+        {register && teacherMode && <input className="form-control" placeholder="Teacher invite code" value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} />}
         <input
           className="form-control"
           placeholder="Email"
