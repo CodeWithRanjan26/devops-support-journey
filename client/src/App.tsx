@@ -640,13 +640,14 @@ function Dashboard() {
   const [user, setUser] = useState<{ name?: string; selectedTrack?: string; weeklyGoal?: number } | null>(() => JSON.parse(localStorage.getItem("dsj-user") || "null"));
   const [studyMinutes, setStudyMinutes] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [activity, setActivity] = useState<{ title: string; detail: string; createdAt: string }[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState(() => JSON.parse(localStorage.getItem("dsj-user") || "{}").weeklyGoal || 3);
   useEffect(() => {
     const token = localStorage.getItem("dsj-token");
     if (!token) return;
     fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }).then((response) => response.ok ? response.json() : null).then((data) => { if (data) { setUser(data); localStorage.setItem("dsj-user", JSON.stringify(data)); } }).catch(() => undefined);
   }, []);
-  useEffect(() => { apiRequest("/api/analytics").then((data) => { const sessions = data.studyTime || []; setStudyMinutes(Math.round(sessions.reduce((sum: number, item: { duration?: number }) => sum + (item.duration || 0), 0) / 60)); const days = new Set(sessions.filter((item: { completedAt?: string }) => item.completedAt).map((item: { completedAt: string }) => new Date(item.completedAt).toDateString())); let current = new Date(); let count = 0; while (days.has(current.toDateString())) { count += 1; current.setDate(current.getDate() - 1); } setStreak(count); }).catch(() => undefined); }, []);
+  useEffect(() => { apiRequest("/api/analytics").then((data) => { const sessions = data.studyTime || []; setStudyMinutes(Math.round(sessions.reduce((sum: number, item: { duration?: number }) => sum + (item.duration || 0), 0) / 60)); }).catch(() => undefined); apiRequest("/api/activity").then((data) => { setStreak(data.streak || 0); setActivity(data.events || []); }).catch(() => undefined); }, []);
   const progress = readProgress();
   const done = allTopics.filter(
     (t) => pct(progress[t.id] || []) === 100,
@@ -701,7 +702,7 @@ function Dashboard() {
         />
       </div>
       <section className="dashboard-personal"><div className="goal-card"><div className="eyebrow">THIS WEEK'S GOAL</div><h2>Complete {weeklyGoal} learning topics</h2><p>Keep your momentum visible and build a study habit that compounds.</p><div className="goal-progress"><i style={{ width: `${Math.min(100, done / weeklyGoal * 100)}%` }} /></div><span>{Math.min(done, weeklyGoal)} of {weeklyGoal} topics completed</span><select className="goal-select" value={weeklyGoal} onChange={async (event) => { const value = Number(event.target.value); setWeeklyGoal(value); const current = JSON.parse(localStorage.getItem("dsj-user") || "{}"); localStorage.setItem("dsj-user", JSON.stringify({ ...current, weeklyGoal: value })); try { await apiRequest("/api/auth/profile", { method: "PATCH", body: JSON.stringify({ weeklyGoal: value }) }); } catch { /* local goal remains available */ } }}><option value="3">3 topics</option><option value="5">5 topics</option><option value="7">7 topics</option></select></div><div className="quick-card"><div className="eyebrow">QUICK ACTIONS</div><div className="quick-actions"><NavLink to={`/module/${module.id}`}><BookOpen size={17} /> Continue topic</NavLink><NavLink to="/study"><Clock3 size={17} /> Start focus session</NavLink><NavLink to="/interview"><GraduationCap size={17} /> Practice interview</NavLink><NavLink to="/notes"><FileText size={17} /> Capture a note</NavLink></div></div><div className="target-card"><div className="eyebrow">YOUR TARGET TRACK</div><h3>{user?.selectedTrack || "DevOps Engineer"}</h3><p>Recommended next: Linux, Networking, Cloud, and Troubleshooting.</p><NavLink to="/tracks">View recommendations <ChevronRight size={15} /></NavLink><small className="dashboard-study-time"><Clock3 size={13} /> {Math.floor(studyMinutes / 60)}h {studyMinutes % 60}m studied · {streak} day streak</small></div></section>
-      <section className="activity-panel panel"><div className="section-head"><div><div className="eyebrow">YOUR ACTIVITY</div><h2>Small steps add up.</h2></div><NavLink to="/analytics">View analytics <ChevronRight size={15} /></NavLink></div><div className="activity-list"><span><i className="activity-dot green-dot" /> Account ready <small>Start your first learning step</small></span><span><i className="activity-dot blue-dot" /> 417 topics available <small>Explore the full roadmap</small></span><span><i className="activity-dot gold-dot" /> Leaderboard live <small>See community momentum</small></span></div></section>
+      <section className="activity-panel panel"><div className="section-head"><div><div className="eyebrow">YOUR ACTIVITY · {streak} DAY STREAK</div><h2>Small steps add up.</h2></div><NavLink to="/analytics">View analytics <ChevronRight size={15} /></NavLink></div><div className="activity-list">{activity.length ? activity.slice(0, 3).map((event) => <span key={event.createdAt + event.title}><i className="activity-dot green-dot" /> {event.title} <small>{event.detail} · {new Date(event.createdAt).toLocaleDateString()}</small></span>) : <span><i className="activity-dot blue-dot" /> Your learning activity will appear here <small>Complete a topic step, save a note, or finish a focus session.</small></span>}</div></section>
       <section className="weak-topics panel"><div className="section-head"><div><div className="eyebrow">RECOMMENDED REVIEW</div><h2>Topics that need another pass.</h2></div><NavLink to="/review">Open review queue <ChevronRight size={15} /></NavLink></div><div className="weak-topic-list">{allTopics.filter((topic) => { const steps = progress[topic.id] || []; return steps.length > 0 && steps.length < 4; }).slice(0, 3).map((topic) => <NavLink to={`/module/${topic.moduleId}`} key={topic.id}><span className="pill">{pct(progress[topic.id] || [])}%</span><b>{topic.title}</b><small>{topic.moduleTitle}</small><ChevronRight size={15} /></NavLink>)}{!allTopics.some((topic) => { const steps = progress[topic.id] || []; return steps.length > 0 && steps.length < 4; }) && <p className="empty-inline">Complete a topic step and your review recommendations will appear here.</p>}</div></section>
       <div className="dashboard-grid">
         <section className="panel continue">
@@ -924,7 +925,7 @@ function TopicDetail({ topic, module }: { topic: Topic; module: Module }) {
         : [...steps, i].sort(),
     };
     setProgress(next);
-      apiRequest(`/api/progress/step/${topic.id}`, { method: "PATCH", body: JSON.stringify({ module: module.id, completedSteps: next[topic.id] }) }).catch(() => undefined);
+      apiRequest(`/api/progress/step/${topic.id}`, { method: "PATCH", body: JSON.stringify({ module: module.id, topicTitle: topic.title, completedSteps: next[topic.id] }) }).catch(() => undefined);
     localStorage.setItem(key, JSON.stringify(next));
   };
   return (
@@ -1010,7 +1011,7 @@ function Study() {
     );
     return () => clearInterval(timer);
   }, [running]);
-  useEffect(() => { if (seconds === 0 && sessionId) { apiRequest("/api/study/complete", { method: "POST", body: JSON.stringify({ id: sessionId, duration: 25 * 60 }) }).catch(() => undefined); setSessionId(null); setRunning(false); } }, [seconds, sessionId]);
+  useEffect(() => { if (seconds === 0 && sessionId) { apiRequest("/api/study/complete", { method: "POST", body: JSON.stringify({ id: sessionId, topic: topic.title, duration: 25 * 60 }) }).catch(() => undefined); setSessionId(null); setRunning(false); } }, [seconds, sessionId, topic.title]);
   const startSession = async () => { if (!running) { try { const session = await apiRequest("/api/study/start", { method: "POST", body: JSON.stringify({ module: topic.moduleTitle, topic: topic.title }) }); setSessionId(session?._id || null); } catch { /* local timer remains usable */ } } setRunning(!running); };
   const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
   const secs = String(seconds % 60).padStart(2, "0");
