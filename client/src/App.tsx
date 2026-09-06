@@ -1001,6 +1001,8 @@ function Study() {
   const [seconds, setSeconds] = useState(25 * 60);
   const [running, setRunning] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [noteContent, setNoteContent] = useState("");
+  const [noteSaved, setNoteSaved] = useState(false);
   const [topicId, setTopicId] = useState(allTopics[0].id);
   const topic = allTopics.find((t) => t.id === topicId)!;
   useEffect(() => {
@@ -1087,10 +1089,11 @@ function Study() {
           </div>
           <div className="note-editor">
             <div className="eyebrow">TOPIC NOTE</div>
-            <textarea placeholder="What did you learn? Write it in your own words..." />
-            <button className="primary">
+            <textarea placeholder="What did you learn? Write it in your own words..." value={noteContent} onChange={(event) => setNoteContent(event.target.value)} />
+            <button className="primary" onClick={async () => { if (!noteContent.trim()) return; try { await apiRequest("/api/notes", { method: "POST", body: JSON.stringify({ module: topic.moduleTitle, topic: topic.title, title: `${topic.title} study note`, content: noteContent, tags: ["study", topic.moduleTitle.toLowerCase().replace(/\s+/g, "-")] }) }); setNoteContent(""); setNoteSaved(true); } catch { setNoteSaved(false); } }}>
               <FileText size={16} /> Save note
             </button>
+            {noteSaved && <small className="note-saved-message">Note saved to your account.</small>}
           </div>
         </section>
       </div>
@@ -1244,7 +1247,7 @@ function Interview() {
   const [search, setSearch] = useState("");
   const [done, setDone] = useState<string[]>(() => JSON.parse(localStorage.getItem("dsj-interview-done") || "[]"));
   const visibleQuestions = questions.filter((item) => (category === "All questions" || item.category === category) && (difficulty === "All difficulties" || item.difficulty === difficulty) && `${item.category} ${item.topic} ${item.question}`.toLowerCase().includes(search.toLowerCase()));
-  const toggleDone = (id: string) => { const next = done.includes(id) ? done.filter((item) => item !== id) : [...done, id]; setDone(next); localStorage.setItem("dsj-interview-done", JSON.stringify(next)); };
+  const toggleDone = (id: string) => { const next = done.includes(id) ? done.filter((item) => item !== id) : [...done, id]; setDone(next); localStorage.setItem("dsj-interview-done", JSON.stringify(next)); if (!done.includes(id)) apiRequest(`/api/interview/questions/${id}`, { method: "PATCH", body: JSON.stringify({ completed: true }) }).catch(() => undefined); };
   return (
     <>
       <PageTitle
