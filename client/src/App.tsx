@@ -1448,6 +1448,9 @@ function Profile() {
   } | null>(null);
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState("");
+  const [draftEmail, setDraftEmail] = useState("");
+  const [draftTrack, setDraftTrack] = useState("DevOps Engineer");
+  const [draftGoal, setDraftGoal] = useState(3);
   useEffect(() => {
     const token = localStorage.getItem("dsj-token");
     if (!token) return;
@@ -1460,6 +1463,9 @@ function Profile() {
         if (data) {
           setUser(data);
           setDraftName(data.name || "");
+          setDraftEmail(data.email || "");
+          setDraftTrack(data.selectedTrack || "DevOps Engineer");
+          setDraftGoal(data.weeklyGoal || 3);
           localStorage.setItem("dsj-user", JSON.stringify(data));
         }
       })
@@ -1468,7 +1474,7 @@ function Profile() {
   const name = user?.name || "Loading profile...";
   const email = user?.email || "";
   const track = user?.selectedTrack || "DevOps Engineer";
-  const saveProfile = async () => { try { const updated = await apiRequest("/api/auth/profile", { method: "PATCH", body: JSON.stringify({ name: draftName }) }); setUser(updated); localStorage.setItem("dsj-user", JSON.stringify(updated)); setEditing(false); } catch { setEditing(false); } };
+  const saveProfile = async () => { try { const updated = await apiRequest("/api/auth/profile", { method: "PATCH", body: JSON.stringify({ name: draftName, email: draftEmail, selectedTrack: draftTrack, weeklyGoal: draftGoal }) }); setUser(updated); localStorage.setItem("dsj-user", JSON.stringify(updated)); setEditing(false); } catch { setEditing(false); } };
   return (
     <>
       <PageTitle
@@ -1479,9 +1485,7 @@ function Profile() {
       <section className="panel profile-panel">
         <div className="profile-avatar">{initials(name)}</div>
         <div>
-          {editing ? <input className="profile-edit-input" value={draftName} onChange={(event) => setDraftName(event.target.value)} /> : <h2>{name}</h2>}
-          <p>{email}</p>
-          <span className="pill">{track}</span>
+          {editing ? <div className="profile-form"><input className="profile-edit-input" value={draftName} onChange={(event) => setDraftName(event.target.value)} placeholder="Name" /><input className="profile-edit-input" value={draftEmail} onChange={(event) => setDraftEmail(event.target.value)} placeholder="Email" type="email" /><select className="profile-edit-input" value={draftTrack} onChange={(event) => setDraftTrack(event.target.value)}>{tracks.map((item) => <option key={item}>{item}</option>)}</select><select className="profile-edit-input" value={draftGoal} onChange={(event) => setDraftGoal(Number(event.target.value))}><option value={3}>3 topics per week</option><option value={5}>5 topics per week</option><option value={7}>7 topics per week</option></select></div> : <><h2>{name}</h2><p>{email}</p><span className="pill">{track}</span></>}
         </div>
         <button className="secondary ms-auto" onClick={() => editing ? saveProfile() : setEditing(true)}>
           <Settings size={16} /> {editing ? "Save profile" : "Edit profile"}

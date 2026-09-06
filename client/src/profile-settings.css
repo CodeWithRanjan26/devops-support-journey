@@ -1,0 +1,2 @@
+.profile-form{display:grid;gap:8px;min-width:280px}.profile-form .profile-edit-input{border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:var(--card);color:var(--ink);font:500 13px 'DM Sans'}
+@media(max-width:760px){.profile-form{min-width:230px}}
