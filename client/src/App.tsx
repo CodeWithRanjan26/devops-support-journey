@@ -287,6 +287,7 @@ import {
   Sun,
   Terminal,
   Trash2,
+  Users,
   UserRound,
   X,
 } from "lucide-react";
@@ -376,6 +377,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Login register />} />
+        <Route path="/secure-admin-setup" element={<AdminSetup />} />
         <Route path="*" element={<Shell />} />
       </Routes>
     </BrowserRouter>
@@ -387,7 +389,7 @@ function Shell() {
   );
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const [user] = useState<{ name?: string }>(() =>
+  const [user] = useState<{ name?: string; role?: string }>(() =>
     JSON.parse(localStorage.getItem("dsj-user") || "{}"),
   );
   useEffect(() => {
@@ -422,6 +424,8 @@ function Shell() {
             <span>{label}</span>
           </NavLink>
         ))}
+        {user.role === "admin" && <NavLink className="side-link" to="/admin"><Users size={18} /><span>Admin panel</span></NavLink>}
+        {user.role === "teacher" && <NavLink className="side-link" to="/teacher"><Users size={18} /><span>My students</span></NavLink>}
         <div className="side-focus">
           <small>CURRENT FOCUS</small>
           <b>Linux Fundamentals</b>
@@ -471,6 +475,8 @@ function Shell() {
             <Route path="/tracks" element={<Tracks />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/teacher" element={<TeacherPanel />} />
             <Route path="*" element={<Dashboard />} />
           </Routes>
         </div>
@@ -589,6 +595,13 @@ function Login({ register = false }: { register?: boolean }) {
       </div>
     </div>
   );
+}
+function AdminSetup() {
+  const navigate = useNavigate();
+  const [form, setForm] = useState({ name: "", email: "", password: "", adminCode: "" });
+  const [error, setError] = useState("");
+  const submit = async () => { try { const response = await fetch(`${apiUrl}/api/auth/admin-register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); const data = await response.json(); if (!response.ok) throw new Error(data.message || "Unable to create administrator"); localStorage.setItem("dsj-token", data.token); localStorage.setItem("dsj-user", JSON.stringify(data.user)); navigate("/admin"); } catch (e) { setError(e instanceof Error ? e.message : "Unable to create administrator"); } };
+  return <div className="auth"><div className="auth-panel"><div className="brand auth-brand"><span>DS</span><div><strong>Private administrator setup</strong><small>Keep this URL and code private</small></div></div><div className="eyebrow">AUTHORIZED STAFF ONLY</div><h1>Create admin account</h1><p>Use the backend-only administrator setup code. This page is not linked from student navigation.</p>{(["name", "email", "password", "adminCode"] as const).map((field) => <input className="form-control" key={field} type={field === "password" || field === "adminCode" ? "password" : field === "email" ? "email" : "text"} placeholder={field === "adminCode" ? "Private setup code" : field[0].toUpperCase() + field.slice(1)} value={form[field]} onChange={(event) => setForm({ ...form, [field]: event.target.value })} />)}{error && <div className="form-error">{error}</div>}<button className="primary w-100" onClick={submit}>Create administrator <ChevronRight size={17} /></button></div><div className="auth-art"><div className="art-copy"><ShieldCheck size={30}/><h2>Private by design.</h2><p>Role access is enforced by the API, not just hidden in the interface.</p></div></div></div>;
 }
 function PageTitle({
   eyebrow,
@@ -1438,6 +1451,18 @@ function Analytics() {
       </section>
     </>
   );
+}
+function AdminPanel() {
+  const [users, setUsers] = useState<any[]>([]);
+  const [error, setError] = useState("");
+  useEffect(() => { apiRequest("/api/admin/users").then(setUsers).catch(() => setError("Only administrators can access this panel.")); }, []);
+  const update = async (user: any, field: string, value: any) => { const updated = await apiRequest(`/api/admin/users/${user._id}`, { method: "PATCH", body: JSON.stringify({ [field]: value }) }); setUsers((items) => items.map((item) => item._id === updated._id ? updated : item)); };
+  return <><PageTitle eyebrow="PRIVATE ADMIN AREA" title="People & enrollment" subtitle="Private student and teacher records. Students never receive this data."/><section className="panel admin-notice"><ShieldCheck size={18}/><span>Admin-only data: contact numbers, experience, subjects, fee status, and teacher assignments.</span></section>{error ? <div className="empty"><p>{error}</p></div> : <div className="admin-table panel"><div className="admin-row admin-head"><span>Name</span><span>Role</span><span>Contact</span><span>Learning / experience</span><span>Fees</span></div>{users.map((user) => <div className="admin-row" key={user._id}><b>{user.name}<small>{user.email}</small></b><span className="pill">{user.role}</span><input placeholder="Phone" defaultValue={user.phone || ""} onBlur={(event) => event.target.value !== (user.phone || "") && update(user, "phone", event.target.value)} /><span>{user.selectedTrack || "-"} {user.experienceYears ? `· ${user.experienceYears} yrs` : ""}</span><select defaultValue={user.feeStatus || "not-applicable"} onChange={(event) => update(user, "feeStatus", event.target.value)}><option>not-applicable</option><option>pending</option><option>partial</option><option>paid</option></select></div>)}</div>}</>;
+}
+function TeacherPanel() {
+  const [students, setStudents] = useState<any[]>([]);
+  useEffect(() => { apiRequest("/api/teacher/students").then(setStudents).catch(() => undefined); }, []);
+  return <><PageTitle eyebrow="TEACHER WORKSPACE" title="My students" subtitle="See assigned students and their learning direction without exposing private administration data."/><div className="teacher-grid">{students.map((student) => <article className="student-card panel" key={student._id}><span className="pill">Student</span><h2>{student.name}</h2><p>{student.email}</p><b>{student.selectedTrack || "No track selected"}</b><small>Weekly goal: {student.weeklyGoal || 3} topics</small></article>)}{!students.length && <div className="empty"><Users size={28}/><h3>No students assigned yet.</h3><p>An administrator can assign students to your teacher account.</p></div>}</div></>;
 }
 function Profile() {
   const navigate = useNavigate();

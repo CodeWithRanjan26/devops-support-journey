@@ -19,6 +19,10 @@ A full-stack learning platform for DevOps, application support, production suppo
 
 MongoDB must be running locally or use an Atlas connection string. The client can run in demo mode before authentication; API-backed auth, notes, progress, resources, study sessions, and interview state are implemented in the server.
 
+## Roles and private administration
+
+Public signup creates a student account. Teacher accounts require the private `TEACHER_INVITE_CODE`, and the first administrator is created through the protected admin setup flow using `ADMIN_SETUP_CODE`. Keep both values only in the backend environment, never in the client or GitHub. Admin-only APIs expose private contact, fee, experience, and assignment fields; students cannot access them.
+
 ## Structure
 
 - `client`: responsive React learning experience
